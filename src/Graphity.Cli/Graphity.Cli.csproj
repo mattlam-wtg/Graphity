@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Graphity.Core\Graphity.Core.csproj" />
+    <ProjectReference Include="..\Graphity.Storage\Graphity.Storage.csproj" />
+    <ProjectReference Include="..\Graphity.Search\Graphity.Search.csproj" />
+    <ProjectReference Include="..\Graphity.Mcp\Graphity.Mcp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="3.0.0-preview.2.26159.112" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>graphity</ToolCommandName>
+  </PropertyGroup>
+
+</Project>

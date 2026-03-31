@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Graphity.Cli/Graphity.Cli.csproj" />
+    <Project Path="src/Graphity.Core/Graphity.Core.csproj" />
+    <Project Path="src/Graphity.Mcp/Graphity.Mcp.csproj" />
+    <Project Path="src/Graphity.Search/Graphity.Search.csproj" />
+    <Project Path="src/Graphity.Storage/Graphity.Storage.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Graphity.Core.Tests/Graphity.Core.Tests.csproj" />
+    <Project Path="tests/Graphity.Search.Tests/Graphity.Search.Tests.csproj" />
+    <Project Path="tests/Graphity.Storage.Tests/Graphity.Storage.Tests.csproj" />
+  </Folder>
+</Solution>
