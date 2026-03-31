@@ -18,6 +18,11 @@
     <Nullable>enable</Nullable>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>graphity</ToolCommandName>
+    <PackageId>Graphity</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>WiseTech Global</Authors>
+    <Description>Code knowledge graph tool — indexes codebases and exposes them via MCP for AI agents</Description>
+    <PackageDescription>Graphity indexes C#, TypeScript, and SQL codebases into queryable knowledge graphs. Exposes 4 MCP tools: query, context, impact, list_repos.</PackageDescription>
   </PropertyGroup>
 
 </Project>

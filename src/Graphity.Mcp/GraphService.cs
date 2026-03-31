@@ -19,6 +19,7 @@ public sealed class GraphService : IDisposable
     private LiteGraphAdapter? _adapter;
     private GraphQuerier? _querier;
     private Bm25Index? _searchIndex;
+    private HybridSearch? _hybridSearch;
     private IndexMetadata? _metadata;
     private bool _initialized;
     private readonly object _lock = new();
@@ -52,6 +53,13 @@ public sealed class GraphService : IDisposable
                 _searchIndex = Bm25Index.Load(dataDir);
             else
                 _searchIndex = new Bm25Index();
+
+            // Initialize hybrid search (BM25 + semantic embeddings)
+            var embedder = new OnnxEmbedder();
+            _hybridSearch = new HybridSearch(_searchIndex, embedder);
+            var embeddingsPath = Path.Combine(dataDir, "embeddings.bin");
+            if (File.Exists(embeddingsPath))
+                _hybridSearch.Load(dataDir);
 
             // Open LiteGraph database
             if (File.Exists(dbPath))
@@ -92,6 +100,15 @@ public sealed class GraphService : IDisposable
         {
             EnsureInitialized();
             return _adapter ?? throw new InvalidOperationException("Graph database not available.");
+        }
+    }
+
+    public HybridSearch? HybridSearch
+    {
+        get
+        {
+            EnsureInitialized();
+            return _hybridSearch;
         }
     }
 

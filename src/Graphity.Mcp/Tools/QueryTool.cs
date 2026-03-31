@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text;
 using Graphity.Core.Graph;
+using Graphity.Search;
 using ModelContextProtocol.Server;
 
 namespace Graphity.Mcp.Tools;
@@ -12,7 +13,7 @@ public class QueryTool
 
     public QueryTool(GraphService service) => _service = service;
 
-    [McpServerTool(Name = "query"), Description("Search the code knowledge graph using keyword search. Returns matching symbols grouped by file.")]
+    [McpServerTool(Name = "query"), Description("Search the code knowledge graph using hybrid keyword + semantic search. Returns matching symbols grouped by file.")]
     public string Query(
         [Description("Search query (e.g., 'UserService', 'authentication', 'database connection')")] string query,
         [Description("Maximum number of results to return")] int limit = 20)
@@ -26,7 +27,13 @@ public class QueryTool
             return $"Error: {ex.Message}";
         }
 
-        var results = _service.SearchIndex.Search(query, limit);
+        // Use hybrid search when embedding index is available, otherwise fall back to BM25
+        IReadOnlyList<SearchResult> results;
+        var hybrid = _service.HybridSearch;
+        if (hybrid != null && hybrid.EmbeddingCount > 0)
+            results = hybrid.Search(query, limit);
+        else
+            results = _service.SearchIndex.Search(query, limit);
         if (results.Count == 0)
             return $"No results found for '{query}'.\n\nHint: Try broader terms, or check list_repos() to confirm the index exists.";
 

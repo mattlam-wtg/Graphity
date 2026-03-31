@@ -9,6 +9,7 @@ public sealed class IndexMetadata
     public DateTime IndexedAtUtc { get; set; }
     public int NodeCount { get; set; }
     public int EdgeCount { get; set; }
+    public string? CommitHash { get; set; }
 
     public void Save(string metadataPath)
     {
