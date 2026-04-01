@@ -13,8 +13,8 @@ using Graphity.Storage;
 var rootCommand = new RootCommand("Graphity — code knowledge graph tool");
 
 var pathArg = new Argument<string>("path") { DefaultValueFactory = _ => ".", Description = "Path to solution or directory" };
-var skipEmbeddingsOption = new Option<bool>("--skip-embeddings", "Skip generating semantic embeddings");
-var verboseOption = new Option<bool>("--verbose", "Show detailed progress including per-file analysis");
+var skipEmbeddingsOption = new Option<bool>("--skip-embeddings") { Description = "Skip generating semantic embeddings" };
+var verboseOption = new Option<bool>("--verbose") { Description = "Show detailed progress including per-file analysis" };
 
 var analyzeCommand = new Command("analyze", "Index a codebase into a knowledge graph");
 analyzeCommand.Add(pathArg);
@@ -91,6 +91,18 @@ analyzeCommand.SetAction(async (parseResult, ct) =>
             CommitHash = commitHash
         };
         metadata.Save(StoragePaths.GetMetadataPath(fullPath));
+
+        // Persist graph to LiteGraph database for traversal queries
+        var dbPath = StoragePaths.GetDatabasePath(fullPath);
+        using (var adapter = new LiteGraphAdapter(dbPath))
+        {
+            await adapter.InitializeAsync(graph.RepoName, ct);
+            foreach (var node in graph.Nodes.Values)
+                await adapter.UpsertNodeAsync(node, ct);
+            foreach (var edge in graph.Edges.Values)
+                await adapter.UpsertEdgeAsync(edge, ct);
+            Console.WriteLine($"  Graph database: {adapter.NodeCount} nodes, {adapter.EdgeCount} edges");
+        }
 
         // Build and save search index
         var index = new Bm25Index();

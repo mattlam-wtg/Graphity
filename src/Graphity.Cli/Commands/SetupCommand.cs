@@ -53,7 +53,9 @@ public static class SetupCommand
 
         Console.WriteLine("[Claude Code] Detected ~/.claude directory");
 
-        var settingsPath = Path.Combine(claudeDir, "settings.json");
+        var settingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".claude.json");
         return ConfigureMcpInJsonFile(settingsPath, "mcpServers", "  Claude Code");
     }
 

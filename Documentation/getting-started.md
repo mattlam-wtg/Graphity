@@ -19,7 +19,7 @@ cd Graphity
 
 # Build and install as a global tool
 dotnet pack src/Graphity.Cli/Graphity.Cli.csproj -c Release
-dotnet tool install -g --add-source src/Graphity.Cli/nupkg Graphity
+dotnet tool install -g --add-source src/Graphity.Cli/bin/Release Graphity --version 1.0.0
 ```
 
 ### From NuGet (Internal)

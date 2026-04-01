@@ -22,97 +22,101 @@ public class ImpactTool
         try
         {
             _service.EnsureInitialized();
+
+            // Clamp depth
+            maxDepth = Math.Clamp(maxDepth, 1, 5);
+
+            // Resolve target symbol
+            var node = await _service.Adapter.GetNodeAsync(target);
+            if (node is null)
+            {
+                var results = _service.SearchIndex.Search(target, 5);
+                if (results.Count == 0)
+                    return $"Symbol '{target}' not found. Try query('{target}') to search first.";
+
+                var best = results
+                    .OrderBy(r => GetTypePriority(r.Type))
+                    .ThenByDescending(r => r.Score)
+                    .First();
+
+                node = await _service.Adapter.GetNodeAsync(best.NodeId);
+                if (node is null)
+                    return $"Symbol '{target}' found in index but not in graph. Re-index may be needed.";
+            }
+
+            // Parse direction
+            var traversalDir = direction.ToLowerInvariant() switch
+            {
+                "upstream" => TraversalDirection.Upstream,
+                "downstream" => TraversalDirection.Downstream,
+                _ => TraversalDirection.Upstream,
+            };
+
+            // Traverse the graph
+            var depthMap = await _service.Querier.TraverseAsync(
+                node.Id, traversalDir, maxDepth, ct: default);
+
+            if (depthMap.Count == 0)
+            {
+                var dirLabel = traversalDir == TraversalDirection.Upstream ? "dependents" : "dependencies";
+                return $"No {dirLabel} found for '{node.Name}' ({node.Type}).\n\nThis symbol appears to be a leaf node with no {dirLabel}.";
+            }
+
+            var sb = new StringBuilder();
+            var directionLabel = traversalDir == TraversalDirection.Upstream ? "upstream (dependents)" : "downstream (dependencies)";
+            sb.AppendLine($"Impact analysis for: {node.Name} ({node.Type})");
+            sb.AppendLine($"Direction: {directionLabel}");
+            sb.AppendLine($"Max depth: {maxDepth}");
+            sb.AppendLine();
+
+            // Calculate risk level
+            var d1Count = depthMap.GetValueOrDefault(1)?.Count ?? 0;
+            var totalAffected = depthMap.Values.Sum(list => list.Count);
+            var risk = CalculateRisk(d1Count, totalAffected);
+
+            sb.AppendLine($"Risk level: {risk}");
+            sb.AppendLine($"Total affected: {totalAffected} symbols");
+            sb.AppendLine();
+
+            // Group by depth with impact labels
+            foreach (var (depth, nodes) in depthMap.OrderBy(kv => kv.Key))
+            {
+                var label = GetDepthLabel(depth);
+                sb.AppendLine($"Depth {depth} — {label} ({nodes.Count} symbols):");
+
+                // Group by type for readability
+                var byType = nodes.GroupBy(n => n.Type).OrderBy(g => g.Key.ToString());
+                foreach (var typeGroup in byType)
+                {
+                    foreach (var affected in typeGroup.Take(10))
+                    {
+                        var filePart = affected.FilePath != null ? $" in {Path.GetFileName(affected.FilePath)}" : "";
+                        sb.AppendLine($"  [{affected.Type}] {affected.Name}{filePart}");
+                    }
+                    if (typeGroup.Count() > 10)
+                        sb.AppendLine($"  ... and {typeGroup.Count() - 10} more {typeGroup.Key} items");
+                }
+                sb.AppendLine();
+            }
+
+            // Next-step hints
+            sb.AppendLine("Next steps:");
+            if (d1Count > 0)
+                sb.AppendLine($"  - Review depth-1 items first (WILL BREAK on modification)");
+            sb.AppendLine($"  - Use context(<name>) on any affected symbol for detailed references");
+            if (traversalDir == TraversalDirection.Upstream)
+                sb.AppendLine($"  - Use impact('{node.Name}', direction: 'downstream') to see dependencies");
+
+            return sb.ToString();
         }
         catch (InvalidOperationException ex)
         {
             return $"Error: {ex.Message}";
         }
-
-        // Clamp depth
-        maxDepth = Math.Clamp(maxDepth, 1, 5);
-
-        // Resolve target symbol
-        var node = await _service.Adapter.GetNodeAsync(target);
-        if (node is null)
+        catch (Exception ex)
         {
-            var results = _service.SearchIndex.Search(target, 5);
-            if (results.Count == 0)
-                return $"Symbol '{target}' not found. Try query('{target}') to search first.";
-
-            var best = results
-                .OrderBy(r => GetTypePriority(r.Type))
-                .ThenByDescending(r => r.Score)
-                .First();
-
-            node = await _service.Adapter.GetNodeAsync(best.NodeId);
-            if (node is null)
-                return $"Symbol '{target}' found in index but not in graph. Re-index may be needed.";
+            return $"Error analyzing impact for '{target}': {ex.Message}";
         }
-
-        // Parse direction
-        var traversalDir = direction.ToLowerInvariant() switch
-        {
-            "upstream" => TraversalDirection.Upstream,
-            "downstream" => TraversalDirection.Downstream,
-            _ => TraversalDirection.Upstream,
-        };
-
-        // Traverse the graph
-        var depthMap = await _service.Querier.TraverseAsync(
-            node.Id, traversalDir, maxDepth, ct: default);
-
-        if (depthMap.Count == 0)
-        {
-            var dirLabel = traversalDir == TraversalDirection.Upstream ? "dependents" : "dependencies";
-            return $"No {dirLabel} found for '{node.Name}' ({node.Type}).\n\nThis symbol appears to be a leaf node with no {dirLabel}.";
-        }
-
-        var sb = new StringBuilder();
-        var directionLabel = traversalDir == TraversalDirection.Upstream ? "upstream (dependents)" : "downstream (dependencies)";
-        sb.AppendLine($"Impact analysis for: {node.Name} ({node.Type})");
-        sb.AppendLine($"Direction: {directionLabel}");
-        sb.AppendLine($"Max depth: {maxDepth}");
-        sb.AppendLine();
-
-        // Calculate risk level
-        var d1Count = depthMap.GetValueOrDefault(1)?.Count ?? 0;
-        var totalAffected = depthMap.Values.Sum(list => list.Count);
-        var risk = CalculateRisk(d1Count, totalAffected);
-
-        sb.AppendLine($"Risk level: {risk}");
-        sb.AppendLine($"Total affected: {totalAffected} symbols");
-        sb.AppendLine();
-
-        // Group by depth with impact labels
-        foreach (var (depth, nodes) in depthMap.OrderBy(kv => kv.Key))
-        {
-            var label = GetDepthLabel(depth);
-            sb.AppendLine($"Depth {depth} — {label} ({nodes.Count} symbols):");
-
-            // Group by type for readability
-            var byType = nodes.GroupBy(n => n.Type).OrderBy(g => g.Key.ToString());
-            foreach (var typeGroup in byType)
-            {
-                foreach (var affected in typeGroup.Take(10))
-                {
-                    var filePart = affected.FilePath != null ? $" in {Path.GetFileName(affected.FilePath)}" : "";
-                    sb.AppendLine($"  [{affected.Type}] {affected.Name}{filePart}");
-                }
-                if (typeGroup.Count() > 10)
-                    sb.AppendLine($"  ... and {typeGroup.Count() - 10} more {typeGroup.Key} items");
-            }
-            sb.AppendLine();
-        }
-
-        // Next-step hints
-        sb.AppendLine("Next steps:");
-        if (d1Count > 0)
-            sb.AppendLine($"  - Review depth-1 items first (WILL BREAK on modification)");
-        sb.AppendLine($"  - Use context(<name>) on any affected symbol for detailed references");
-        if (traversalDir == TraversalDirection.Upstream)
-            sb.AppendLine($"  - Use impact('{node.Name}', direction: 'downstream') to see dependencies");
-
-        return sb.ToString();
     }
 
     private static string CalculateRisk(int d1Count, int totalAffected)
